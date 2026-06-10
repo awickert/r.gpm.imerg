@@ -1,0 +1,216 @@
+<h2>DESCRIPTION</h2>
+
+<em>r.gpm.imerg</em> downloads NASA
+<a href="https://gpm.nasa.gov/data/imerg">GPM IMERG</a>
+(Integrated Multi-satellitE Retrievals for GPM) global precipitation data
+and imports raster maps into GRASS GIS.
+
+<p>
+IMERG provides global precipitation estimates at 0.1° spatial resolution
+from 60°S to 60°N, covering 2000-06-01 to near-present. Data are accessed
+via NASA Earthdata using the <tt>earthaccess</tt> Python library; a free
+NASA Earthdata account is required.
+</p>
+
+<p>
+Each granule is imported as a separate raster map named
+<tt>&lt;output&gt;_YYYYMMDD</tt> (daily),
+<tt>&lt;output&gt;_YYYYMM</tt> (monthly), or
+<tt>&lt;output&gt;_YYYYMMDD_HHMM</tt> (half-hourly), and automatically
+reprojected and clipped to the current GRASS computational region via
+<em>r.import</em>.
+</p>
+
+<h2>NOTES</h2>
+
+<h3>Products and processing runs</h3>
+
+<table>
+  <tr>
+    <th>Product</th><th>Code</th><th>Temporal resolution</th><th>Available runs</th>
+  </tr>
+  <tr>
+    <td>Half-hourly</td><td>HH</td><td>30 minutes</td><td>E, L, F</td>
+  </tr>
+  <tr>
+    <td>Daily</td><td>D</td><td>1 day</td><td>E, L, F</td>
+  </tr>
+  <tr>
+    <td>Monthly</td><td>M</td><td>1 month</td><td>F only</td>
+  </tr>
+</table>
+
+<p>
+Processing runs differ in latency and accuracy:
+</p>
+
+<table>
+  <tr>
+    <th>Run</th><th>Code</th><th>Latency</th><th>Notes</th>
+  </tr>
+  <tr>
+    <td>Early</td><td>E</td><td>~4 hours</td><td>Near-real-time; least accurate</td>
+  </tr>
+  <tr>
+    <td>Late</td><td>L</td><td>~12 hours</td><td>Near-real-time; improved over Early</td>
+  </tr>
+  <tr>
+    <td>Final</td><td>F</td><td>~3.5 months</td>
+    <td>Research quality; gauge-corrected</td>
+  </tr>
+</table>
+
+<h3>Variables</h3>
+
+<table>
+  <tr>
+    <th>Code</th><th>Description</th><th>Units</th>
+  </tr>
+  <tr>
+    <td>precipitationCal</td>
+    <td>Calibrated precipitation (gauge-corrected for Final run)</td>
+    <td>mm/hr</td>
+  </tr>
+  <tr>
+    <td>precipitationUncal</td>
+    <td>Uncalibrated multi-satellite precipitation</td>
+    <td>mm/hr</td>
+  </tr>
+  <tr>
+    <td>HQprecipitation</td>
+    <td>High-quality microwave-only precipitation</td>
+    <td>mm/hr</td>
+  </tr>
+  <tr>
+    <td>IRprecipitation</td>
+    <td>Infrared-only precipitation</td>
+    <td>mm/hr</td>
+  </tr>
+  <tr>
+    <td>randomError</td>
+    <td>Random error estimate</td>
+    <td>mm/hr</td>
+  </tr>
+  <tr>
+    <td>probabilityLiquidPrecipitation</td>
+    <td>Probability of liquid (vs. solid) precipitation</td>
+    <td>%</td>
+  </tr>
+</table>
+
+<p>
+All precipitation variables are stored as <b>rates (mm/hr)</b>, not
+accumulations. To convert daily output to a daily total:
+</p>
+
+<div class="code"><pre>
+r.mapcalc "pr_mm_day = pr_20200101 * 24"
+</pre></div>
+
+<p>
+For half-hourly output, multiply by 0.5 to get mm per 30-minute period.
+</p>
+
+<h3>Authentication</h3>
+
+A free
+<a href="https://urs.earthdata.nasa.gov/">NASA Earthdata</a>
+account is required. Credentials are read in order:
+
+<ol>
+  <li>Environment variables <tt>EARTHDATA_USERNAME</tt> and
+      <tt>EARTHDATA_PASSWORD</tt></li>
+  <li><tt>~/.netrc</tt> entry for <tt>urs.earthdata.nasa.gov</tt></li>
+  <li>Interactive prompt (if running in a terminal)</li>
+</ol>
+
+<h3>Download strategy</h3>
+
+<em>r.gpm.imerg</em> uses <tt>earthaccess</tt> to search the NASA Common
+Metadata Repository (CMR) and download matching granules to a temporary
+directory. Files are processed one at a time and deleted after import to
+minimize disk usage.
+
+<p>
+Half-hourly requests produce 48 granules per day (~5–10 MB each). For a
+multi-day request, consider using the daily product instead.
+</p>
+
+<h3>Spatial coverage</h3>
+
+IMERG provides coverage from 60°S to 60°N. Pixels outside this range are
+fill values. <em>r.import</em> clips data to the current GRASS
+computational region, so regions outside ±60° latitude will be empty.
+
+<h3>Space-time raster datasets</h3>
+
+Use the <b>-t</b> flag to register imported maps as a GRASS space-time
+raster dataset (<em>strds</em>). Each map's temporal extent covers one
+granule period (30 minutes, 1 day, or 1 month).
+
+<h2>EXAMPLES</h2>
+
+Import daily Final-run calibrated precipitation for January 2020:
+<div class="code"><pre>
+r.gpm.imerg output=pr variable=precipitationCal product=D run=F \
+    start=2020-01-01 end=2020-01-31
+</pre></div>
+
+Import and register as a space-time raster dataset:
+<div class="code"><pre>
+r.gpm.imerg output=pr variable=precipitationCal product=D run=F \
+    start=2020-01-01 end=2020-12-31 -t
+</pre></div>
+
+Import a single day of half-hourly Early-run data:
+<div class="code"><pre>
+r.gpm.imerg output=pr_hh variable=precipitationCal product=HH run=E \
+    start=2020-07-04 end=2020-07-04 -t
+</pre></div>
+
+Import monthly Final-run precipitation for a full year:
+<div class="code"><pre>
+r.gpm.imerg output=pr_mo variable=precipitationCal product=M run=F \
+    start=2020-01-01 end=2020-12-31 -t
+</pre></div>
+
+Convert imported daily rate maps to daily totals (mm/day):
+<div class="code"><pre>
+for map in $(g.list type=raster pattern="pr_2020*"); do
+    r.mapcalc "${map}_mm = ${map} * 24" --overwrite
+done
+</pre></div>
+
+<h2>REQUIREMENTS</h2>
+
+<ul>
+  <li>Python package <tt>earthaccess</tt> —
+      <tt>pip3 install --break-system-packages earthaccess</tt></li>
+  <li>Python package <tt>h5py</tt> —
+      <tt>sudo apt install python3-h5py</tt> (Debian/Ubuntu)</li>
+  <li>GDAL CLI tools (<tt>gdal_translate</tt>) — typically installed with GRASS</li>
+  <li>NASA Earthdata account —
+      <a href="https://urs.earthdata.nasa.gov/">urs.earthdata.nasa.gov</a></li>
+</ul>
+
+<h2>REFERENCES</h2>
+
+Huffman G.J., Stocker E.F., Bolvin D.T., Nelkin E.J., Tan J. (2023):
+GPM IMERG Final Precipitation L3 Half Hourly 0.1 degree x 0.1 degree V07.
+<em>Goddard Earth Sciences Data and Information Services Center (GES DISC)</em>,
+Greenbelt, MD.
+<a href="https://doi.org/10.5067/GPM/IMERG/3B-HH/07">doi:10.5067/GPM/IMERG/3B-HH/07</a>
+
+<h2>SEE ALSO</h2>
+
+<em>
+<a href="r.import.html">r.import</a>,
+<a href="r.in.gridmet.html">r.in.gridmet</a>,
+<a href="r.in.prism.html">r.in.prism</a>,
+<a href="t.create.html">t.create</a>,
+<a href="t.register.html">t.register</a>
+</em>
+
+<h2>AUTHOR</h2>
+
+Andrew Wickert
