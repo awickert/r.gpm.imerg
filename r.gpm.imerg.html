@@ -115,13 +115,22 @@ For half-hourly output, multiply by 0.5 to get mm per 30-minute period.
 
 A free
 <a href="https://urs.earthdata.nasa.gov/">NASA Earthdata</a>
-account is required. Credentials are read in order:
+account is required. Credentials are resolved in this order:
 
 <ol>
-  <li>Environment variables <tt>EARTHDATA_USERNAME</tt> and
-      <tt>EARTHDATA_PASSWORD</tt></li>
-  <li><tt>~/.netrc</tt> entry for <tt>urs.earthdata.nasa.gov</tt></li>
-  <li>Interactive prompt (if running in a terminal)</li>
+  <li><b>username= option</b> — provide your Earthdata username on the
+      command line; the password is prompted securely at runtime via
+      <tt>getpass</tt> and never stored.</li>
+  <li><b>Environment variables</b> — set <tt>EARTHDATA_USERNAME</tt> and
+      <tt>EARTHDATA_PASSWORD</tt> before running.</li>
+  <li><b>~/.netrc</b> — add an entry for <tt>urs.earthdata.nasa.gov</tt>:
+<div class="code"><pre>
+machine urs.earthdata.nasa.gov
+login YOUR_USERNAME
+password YOUR_PASSWORD
+</pre></div>
+      Set permissions with <tt>chmod 600 ~/.netrc</tt>.
+  </li>
 </ol>
 
 <h3>Download strategy</h3>

@@ -84,6 +84,14 @@
 #%  required: no
 #%end
 
+#%option
+#%  key: username
+#%  type: string
+#%  label: NASA Earthdata username (password prompted at runtime)
+#%  description: If omitted, credentials are read from EARTHDATA_USERNAME/EARTHDATA_PASSWORD environment variables or ~/.netrc
+#%  required: no
+#%end
+
 #%flag
 #%  key: t
 #%  description: Register output maps as a space-time raster dataset (strds)
@@ -94,8 +102,6 @@ import re
 import subprocess
 import tempfile
 import atexit
-import struct
-import sys
 from datetime import date, datetime, timedelta
 
 import grass.script as gs
@@ -297,6 +303,7 @@ def main():
     start    = options['start']
     end      = options['end'] or start
     resample = options['resample']
+    username = options['username']
     flag_t   = flags['t']
 
     try:
@@ -342,11 +349,29 @@ def main():
 
     # NASA Earthdata login
     gs.message("Logging in to NASA Earthdata...")
-    gs.message("  Set EARTHDATA_USERNAME and EARTHDATA_PASSWORD, or configure ~/.netrc.")
+    _AUTH_HELP = (
+        "Provide username= (password prompted at runtime), set "
+        "EARTHDATA_USERNAME and EARTHDATA_PASSWORD environment variables, "
+        "or add urs.earthdata.nasa.gov to ~/.netrc."
+    )
     try:
-        earthaccess.login()
+        if username:
+            import getpass
+            password = getpass.getpass(
+                "NASA Earthdata password for {}: ".format(username)
+            )
+            os.environ['EARTHDATA_USERNAME'] = username
+            os.environ['EARTHDATA_PASSWORD'] = password
+            earthaccess.login(strategy="environment")
+        elif os.environ.get('EARTHDATA_USERNAME') and os.environ.get('EARTHDATA_PASSWORD'):
+            earthaccess.login(strategy="environment")
+        else:
+            try:
+                earthaccess.login(strategy="netrc")
+            except Exception:
+                gs.fatal("NASA Earthdata login failed. " + _AUTH_HELP)
     except Exception as e:
-        gs.fatal("NASA Earthdata login failed: {}".format(e))
+        gs.fatal("NASA Earthdata login failed: {}. {}".format(e, _AUTH_HELP))
 
     # Search for granules
     gs.message("Searching {} ({} to {})...".format(short_name, start_date, end_date))
